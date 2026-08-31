@@ -25,7 +25,7 @@ export interface AssistantMessage {
 }
 
 // 消息联合类型
-export type Message = UserMessage | AssistantMessage;
+export type Message = UserMessage | AssistantMessage | ToolMessage;
 
 // 模型请求
 export interface ModelRequest {
@@ -38,5 +38,24 @@ export interface ModelRequest {
 export type ModelEvent =
     | { type: "start" }
     | { type: "text_delta"; delta: string }
+    | { type: "tool_call"; toolCall: ToolCall }
     | { type: "done" }
     | { type: "error"; error: Error };
+
+// 工具调用类型
+export interface ToolCall {
+    id: string;
+    name: string;
+    input: unknown;
+}
+
+// 工具消息
+export interface ToolMessage {
+    role: "tool";
+    toolCallId: string;
+    name: string;
+    content: TextContent[];
+    isError: boolean;
+    timestamp: number;
+}
+

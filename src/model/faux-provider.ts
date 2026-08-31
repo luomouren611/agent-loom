@@ -1,13 +1,18 @@
 import type { ModelProvider } from "./provider.ts";
-import type { ModelEvent, ModelRequest } from "./types.ts";
+import type { ModelEvent, ModelRequest, ToolCall } from "./types.ts";
+
+export type FauxScriptEvent =
+    | string
+    | { type: "tool_call"; toolCall: ToolCall };
 
 export class FauxProvider implements ModelProvider {
     readonly id = "faux";
     readonly requests: ModelRequest[] = [];
-    private responses: string[][];
+    private responses: FauxScriptEvent[][];
 
-    constructor(responses: string[][]) {
-        this.responses = responses.map((chunks) => chunks.slice());
+
+    constructor(responses: FauxScriptEvent[][]) {
+        this.responses = responses.map((events) => events.slice());
     }
 
     async *stream(request: ModelRequest): AsyncIterable<ModelEvent> {
@@ -16,8 +21,8 @@ export class FauxProvider implements ModelProvider {
             messages: request.messages.slice(),
         });
 
-        const chunks = this.responses.shift();
-        if (!chunks) {
+        const events = this.responses.shift();
+        if (!events) {
             yield {
                 type: "error",
                 error: new Error("No scripted faux response remains"),
@@ -27,7 +32,7 @@ export class FauxProvider implements ModelProvider {
 
         yield { type: "start" };
 
-        for (const chunk of chunks) {
+        for (const scriptedEvent of events) {
             if (request.signal?.aborted) {
                 yield {
                     type: "error",
@@ -36,8 +41,13 @@ export class FauxProvider implements ModelProvider {
                 return;
             }
 
-            yield { type: "text_delta", delta: chunk };
+            if (typeof scriptedEvent === "string") {
+                yield { type: "text_delta", delta: scriptedEvent };
+            } else {
+                yield scriptedEvent;
+            }
         }
+
 
         yield { type: "done" };
     }
