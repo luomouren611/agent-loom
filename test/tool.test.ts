@@ -50,6 +50,8 @@ test("executes a tool call and stores the tool result", async () => {
             "message_start",
             "message_update",
             "tool_call_start",
+            "message_start",
+            "message_end",
             "tool_call_end",
             "message_end",
             "agent_end",

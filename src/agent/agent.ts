@@ -18,6 +18,12 @@ export interface AgentOptions {
     maxIterations?: number;
 }
 
+interface ModelTurnResult {
+    message: AssistantMessage;
+    toolCallCount: number;
+}
+
+
 export class Agent {
     readonly messages: Message[] = [];
     private readonly listeners = new Set<AgentEventListener>();
@@ -63,6 +69,21 @@ export class Agent {
         }
     }
 
+    private async finishToolCall(
+        toolCall: ToolCall,
+        content: string,
+        isError: boolean,
+    ): Promise<ToolMessage> {
+        const message = this.createToolMessage(toolCall, content, isError);
+
+        await this.emit({ type: "message_start", message });
+        await this.emit({ type: "message_end", message });
+        await this.emit({ type: "tool_call_end", toolCall, message });
+
+        return message;
+    }
+
+
     private async executeToolCall(
         toolCall: ToolCall,
         signal?: AbortSignal,
@@ -72,35 +93,26 @@ export class Agent {
         const tool = this.tools.get(toolCall.name);
 
         if (!tool) {
-            const message = this.createToolMessage(
+            return await this.finishToolCall(
                 toolCall,
                 `Unknown tool: ${toolCall.name}`,
                 true,
             );
-
-            await this.emit({ type: "tool_call_end", toolCall, message });
-            return message;
         }
 
         try {
             const result = await tool.execute(toolCall.input, signal);
-            const message = this.createToolMessage(
+            return await this.finishToolCall(
                 toolCall,
                 result.content,
                 result.isError ?? false,
             );
-
-            await this.emit({ type: "tool_call_end", toolCall, message });
-            return message;
         } catch (error) {
-            const message = this.createToolMessage(
+            return await this.finishToolCall(
                 toolCall,
                 error instanceof Error ? error.message : String(error),
                 true,
             );
-
-            await this.emit({ type: "tool_call_end", toolCall, message });
-            return message;
         }
     }
 
@@ -176,6 +188,63 @@ export class Agent {
 
 
     }
+
+    private async runModelTurn(signal?: AbortSignal): Promise<ModelTurnResult> {
+        const textContent: TextContent = { type: "text", text: "" };
+        const assistantMessage: AssistantMessage = {
+            role: "assistant",
+            content: [textContent],
+            stopReason: "stop",
+            timestamp: Date.now(),
+        };
+
+        await this.emit({ type: "message_start", message: assistantMessage });
+
+        const requestMessages = this.messages.slice();
+        this.messages.push(assistantMessage);
+
+        let toolCallCount = 0;
+
+        try {
+            const stream = this.provider.stream({
+                systemPrompt: this.systemPrompt,
+                messages: requestMessages,
+                signal,
+            });
+
+            for await (const event of stream) {
+                if (event.type === "text_delta") {
+                    textContent.text += event.delta;
+                    await this.emit({
+                        type: "message_update",
+                        message: assistantMessage,
+                        delta: event.delta,
+                    });
+                } else if (event.type === "tool_call") {
+                    toolCallCount += 1;
+                    const toolMessage = await this.executeToolCall(event.toolCall, signal);
+                    this.messages.push(toolMessage);
+                } else if (event.type === "error") {
+                    assistantMessage.stopReason = signal?.aborted ? "aborted" : "error";
+                    assistantMessage.errorMessage = event.error.message;
+                    break;
+                }
+            }
+        } catch (error) {
+            assistantMessage.stopReason = signal?.aborted ? "aborted" : "error";
+            assistantMessage.errorMessage =
+                error instanceof Error ? error.message : String(error);
+        }
+
+        await this.emit({ type: "message_end", message: assistantMessage });
+
+        return {
+            message: assistantMessage,
+            toolCallCount,
+        };
+    }
+
+
 }
 
 
