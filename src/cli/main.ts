@@ -21,6 +21,7 @@ if (!prompt) {
                 },
             },
         ],
+        ["计算结果是 5。"],
     ]);
     const agent = new Agent({
         provider,
