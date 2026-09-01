@@ -13,7 +13,8 @@ export interface UserMessage {
 
 // 助手消息
 // 1.先定义停止原因：
-export type AssistantStopReason = "stop" | "error" | "aborted";
+export type AssistantStopReason =
+    "stop" | "error" | "aborted" | "max_iterations";
 
 // 2.然后定义消息：
 export interface AssistantMessage {
