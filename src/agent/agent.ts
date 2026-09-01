@@ -15,6 +15,7 @@ export interface AgentOptions {
     provider: ModelProvider;
     systemPrompt?: string;
     tools?: readonly Tool[];
+    maxIterations?: number;
 }
 
 export class Agent {
@@ -23,6 +24,8 @@ export class Agent {
     private readonly provider: ModelProvider;
     private readonly systemPrompt?: string;
     private readonly tools: ToolRegistry;
+    private readonly maxIterations: number;
+
 
     // 创建工具消息的辅助方法
     private createToolMessage(
@@ -45,6 +48,8 @@ export class Agent {
         this.provider = options.provider;
         this.systemPrompt = options.systemPrompt;
         this.tools = new ToolRegistry(options.tools);
+        this.maxIterations = options.maxIterations ?? 5;
+
     }
 
     subscribe(listener: AgentEventListener): () => void {
@@ -98,8 +103,6 @@ export class Agent {
             return message;
         }
     }
-
-
 
     async prompt(text: string, signal?: AbortSignal): Promise<AssistantMessage> {
         // 后续内容写在这里
