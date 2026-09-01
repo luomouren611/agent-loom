@@ -116,9 +116,18 @@ export class Agent {
         }
     }
 
+    private createMaxIterationsMessage(): AssistantMessage {
+        return {
+            role: "assistant",
+            content: [{ type: "text", text: "" }],
+            stopReason: "max_iterations",
+            errorMessage: `Agent stopped after ${this.maxIterations} iterations.`,
+            timestamp: Date.now(),
+        };
+    }
+
+
     async prompt(text: string, signal?: AbortSignal): Promise<AssistantMessage> {
-        // 后续内容写在这里
-        // 第一部分：创建并保存用户消息。
         const userMessage: UserMessage = {
             role: "user",
             content: [{ type: "text", text }],
@@ -130,64 +139,32 @@ export class Agent {
         this.messages.push(userMessage);
         await this.emit({ type: "message_end", message: userMessage });
 
-        // 第二部分：创建空助手消息。
-        const textContent: TextContent = { type: "text", text: "" };
-        const assistantMessage: AssistantMessage = {
-            role: "assistant",
-            content: [textContent],
-            stopReason: "stop",
-            timestamp: Date.now(),
-        };
+        let lastAssistantMessage: AssistantMessage | undefined;
 
-        await this.emit({ type: "message_start", message: assistantMessage });
+        for (let iteration = 0; iteration < this.maxIterations; iteration += 1) {
+            const result = await this.runModelTurn(signal);
+            lastAssistantMessage = result.message;
 
-        // Keep the provider request limited to completed prior messages while
-        // reserving the assistant's correct position in conversation history.
-        const requestMessages = this.messages.slice();
-        this.messages.push(assistantMessage);
-
-
-        // 第三部分：调用 Provider 并累计文本。
-        try {
-            const stream = this.provider.stream({
-                systemPrompt: this.systemPrompt,
-                messages: requestMessages,
-                signal,
-            });
-
-            for await (const event of stream) {
-                if (event.type === "text_delta") {
-                    textContent.text += event.delta;
-                    await this.emit({
-                        type: "message_update",
-                        message: assistantMessage,
-                        delta: event.delta,
-                    });
-                }
-                // 工具调用处理
-                else if (event.type === "tool_call") {
-                    const toolMessage = await this.executeToolCall(event.toolCall, signal);
-                    this.messages.push(toolMessage);
-                }
-                else if (event.type === "error") {
-                    assistantMessage.stopReason = signal?.aborted ? "aborted" : "error";
-                    assistantMessage.errorMessage = event.error.message;
-                    break;
-                }
+            if (result.message.stopReason !== "stop") {
+                await this.emit({ type: "agent_end", message: result.message });
+                return result.message;
             }
-        } catch (error) {
-            assistantMessage.stopReason = signal?.aborted ? "aborted" : "error";
-            assistantMessage.errorMessage =
-                error instanceof Error ? error.message : String(error);
+
+            if (result.toolCallCount === 0) {
+                await this.emit({ type: "agent_end", message: result.message });
+                return result.message;
+            }
         }
 
-        // 第四部分：保存助手消息并发出结束事件。
-        await this.emit({ type: "message_end", message: assistantMessage });
-        await this.emit({ type: "agent_end", message: assistantMessage });
-        return assistantMessage;
+        const message = this.createMaxIterationsMessage();
+        this.messages.push(message);
+        await this.emit({ type: "message_start", message });
+        await this.emit({ type: "message_end", message });
+        await this.emit({ type: "agent_end", message });
 
-
+        return message;
     }
+
 
     private async runModelTurn(signal?: AbortSignal): Promise<ModelTurnResult> {
         const textContent: TextContent = { type: "text", text: "" };
