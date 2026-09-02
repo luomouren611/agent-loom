@@ -186,6 +186,10 @@ export class Agent {
             const stream = this.provider.stream({
                 systemPrompt: this.systemPrompt,
                 messages: requestMessages,
+                tools: this.tools.list().map((tool) => ({
+                    name: tool.name,
+                    description: tool.description,
+                })),
                 signal,
             });
 

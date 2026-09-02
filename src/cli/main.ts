@@ -1,6 +1,8 @@
 import { Agent } from "../agent/agent.ts";
 import { FauxProvider } from "../model/faux-provider.ts";
 import { CalculatorTool } from "../tool/calculator-tool.ts";
+import { RuleBasedProvider } from "../model/rule-based-provider.ts";
+
 
 
 const prompt = process.argv.slice(2).join(" ").trim();
@@ -9,20 +11,7 @@ if (!prompt) {
     console.error('Usage: npm start -- "your message"');
     process.exitCode = 1;
 } else {
-    const provider = new FauxProvider([
-        [
-            "我会调用计算工具。",
-            {
-                type: "tool_call",
-                toolCall: {
-                    id: "call_1",
-                    name: "calculator",
-                    input: { expression: "2 + 3" },
-                },
-            },
-        ],
-        ["计算结果是 5。"],
-    ]);
+    const provider = new RuleBasedProvider();
     const agent = new Agent({
         provider,
         systemPrompt: "You are a concise assistant.",

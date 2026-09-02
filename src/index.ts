@@ -3,6 +3,7 @@ export type { AgentEvent, AgentEventListener } from "./agent/event.ts";
 export { FauxProvider } from "./model/faux-provider.ts";
 export type { ModelProvider } from "./model/provider.ts";
 export { CalculatorTool } from "./tool/calculator-tool.ts";
+export { RuleBasedProvider } from "./model/rule-based-provider.ts";
 export { ToolRegistry } from "./tool/registry.ts";
 export type { Tool, ToolResult } from "./tool/types.ts";
 
@@ -15,5 +16,6 @@ export type {
     TextContent,
     UserMessage,
     ToolCall,
-    ToolMessage
+    ToolMessage,
+    ModelToolDefinition
 } from "./model/types.ts";

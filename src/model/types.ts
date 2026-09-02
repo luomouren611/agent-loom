@@ -32,6 +32,7 @@ export type Message = UserMessage | AssistantMessage | ToolMessage;
 export interface ModelRequest {
     systemPrompt?: string;
     messages: readonly Message[];
+    tools?: readonly ModelToolDefinition[];
     signal?: AbortSignal;
 }
 
@@ -60,3 +61,8 @@ export interface ToolMessage {
     timestamp: number;
 }
 
+// 工具增加定义
+export interface ModelToolDefinition {
+    name: string;
+    description: string;
+}
