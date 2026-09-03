@@ -1,7 +1,5 @@
 import { Agent } from "../agent/agent.ts";
-import { FauxProvider } from "../model/faux-provider.ts";
 import { CalculatorTool } from "../tool/calculator-tool.ts";
-import { RuleBasedProvider } from "../model/rule-based-provider.ts";
 import { createProviderFromEnv } from "./config.ts";
 
 const prompt = process.argv.slice(2).join(" ").trim();
@@ -10,8 +8,7 @@ if (!prompt) {
     console.error('Usage: npm start -- "your message"');
     process.exitCode = 1;
 } else {
-    // const provider = new RuleBasedProvider(); 第四阶段模拟provider
-    const provider = createProviderFromEnv() // 五阶段：真实provider
+    const provider = createProviderFromEnv();
 
     const agent = new Agent({
         provider,
